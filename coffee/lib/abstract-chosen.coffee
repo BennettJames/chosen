@@ -124,8 +124,53 @@ class AbstractChosen
     else
       this.results_show()
 
+
+  
+  get_matches: (data, pattern) ->
+    matches = []
+
+    for option in data
+      text = option.search_text
+      matchIndex = @fuzzy(text, pattern)
+      if matchIndex >= 0
+        liText = text.substr(0, matchIndex)
+        liText += "<em>" + text.substr(matchIndex, pattern.length) + "</em>"
+        liText += text.substr(matchIndex + pattern.length)
+        matches.push(liText)
+
+    return matches
+
+
+  the_winnowing: ->
+    @no_results_clear()
+
+    searchText = @get_search_text()
+    results = @get_matches(@results_data, searchText)
+
+
+    @result_clear_highlight()
+
+    if results.length < 1 and searchText.length
+      @update_results_content("")
+      @no_results(searchText)
+    else
+      @update_results_content(results.join(''))
+      @winnow_results_set_highlight()
+
+
+  fuzzy: (text, pattern) ->
+
+
+    return -1
+
+                  
   winnow_results: ->
+
+    # @the_winnowing()
+    # return
+          
     this.no_results_clear()
+
 
     results = 0
 
@@ -155,14 +200,16 @@ class AbstractChosen
 
           option.search_text = if option.group then option.label else option.html
           option.search_match = this.search_string_match(option.search_text, regex)
+#          option.search_match = @fuzzy_match(option.search_text, searchText)
           results += 1 if option.search_match and not option.group
 
           if option.search_match
             if searchText.length
               startpos = option.search_text.search zregex
-              text = option.search_text.substr(0, startpos + searchText.length) + '</em>' + option.search_text.substr(startpos + searchText.length)
-              option.search_text = text.substr(0, startpos) + '<em>' + text.substr(startpos)
-
+              start_text = option.search_text
+              option.search_text = start_text.substr(0, startpos) + '<em>' +
+                                   start_text.substr(startpos, searchText.length) + '</em>' +
+                                   start_text.substr(startpos + searchText.length)
             results_group.group_match = true if results_group?
           
           else if option.group_array_index? and @results_data[option.group_array_index].search_match
@@ -187,6 +234,18 @@ class AbstractChosen
         for part in parts
           if regex.test part
             return true
+
+  # A wrapper to the fuzzy search function to bring it's functionality
+  # more in line with search_string_match.
+  fuzzy_match: (string_to_search, search_text) ->
+    string_to_search = string_to_search.toLowerCase()
+    search_text = search_text.toLowerCase()
+    
+    if search_text.length == 0
+      return true
+    return fuzzy(string_to_search, search_text) || undefined
+
+            
 
   choices_count: ->
     return @selected_option_count if @selected_option_count?

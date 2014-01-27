@@ -166,7 +166,7 @@ class @Chosen extends AbstractChosen
     else
       this.close_field()
 
-  results_build: ->
+    results_build: ->
     @parsing = true
     @selected_option_count = null
 
