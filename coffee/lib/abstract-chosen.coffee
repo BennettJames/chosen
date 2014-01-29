@@ -54,52 +54,6 @@ class AbstractChosen
       @active_field = false
       setTimeout (=> this.blur_test()), 100
 
-  results_option_build: (options) ->
-    content = ''
-    for data in @results_data
-      if data.group
-        content += this.result_add_group data
-      else
-        content += this.result_add_option data
-
-      # this select logic pins on an awkward flag
-      # we can make it better
-      if options?.first
-        if data.selected and @is_multiple
-          this.choice_build data
-        else if data.selected and not @is_multiple
-          this.single_set_selected_text(data.text)
-
-    content
-
-  result_add_option: (option) ->
-    return '' unless option.search_match
-    return '' unless this.include_option_in_results(option)
-
-    classes = []
-    classes.push "active-result" if !option.disabled and !(option.selected and @is_multiple)
-    classes.push "disabled-result" if option.disabled and !(option.selected and @is_multiple)
-    classes.push "result-selected" if option.selected
-    classes.push "group-option" if option.group_array_index?
-    classes.push option.classes if option.classes != ""
-
-    option_el = document.createElement("li")
-    option_el.className = classes.join(" ")
-    option_el.style.cssText = option.style
-    option_el.setAttribute("data-option-array-index", option.array_index)
-    option_el.innerHTML = option.search_text
-
-    this.outerHTML(option_el)
-
-  result_add_group: (group) ->
-    return '' unless group.search_match || group.group_match
-    return '' unless group.active_options > 0
-
-    group_el = document.createElement("li")
-    group_el.className = "group-result"
-    group_el.innerHTML = group.search_text
-
-    this.outerHTML(group_el)
 
   results_update_field: ->
     this.set_default_text()
@@ -124,105 +78,104 @@ class AbstractChosen
     else
       this.results_show()
 
+  initialize_selected_option: (option) ->
+    if @is_multiple
+      @choice_build option
+    else
+      @single_set_selected_text option.text
+      
 
-  
+  make_option_element: (option, text) ->
+    newLi = document.createElement("li")
+    text ||= if option.group then option.label else option.html
+    newLi.innerHTML = text
+
+    if option.group
+      newLi.className = "group-result"
+      return newLi  
+
+    classes = []
+    if !(option.selected and @is_multiple)
+      classes.push(if option.disabled then "disable-result" else "active-result")
+    classes.push "result_selected" if option.selected
+    classes.push "group-option" if option.group_array_index?
+    classes.push option.classes if option.classes != ""
+    
+    newLi.className = classes.join(" ")
+    newLi.style.cssText = option.style
+    newLi.setAttribute "data-option-array-index", option.array_index
+
+    return newLi
+
+
+  search_option: (option, pattern) ->
+    return fuzzy(option.label || option.html, pattern)
+
+            
   get_matches: (data, pattern) ->
     matches = []
 
+    wrapAtIndex = (text, index) ->
+      return text if index < 0
+      text.substr(0, index) +
+        "<em>" + text.substr(index, pattern.length) + "</em>" +
+        text.substr(index + pattern.length)
+
+    groupedData = {}
     for option in data
-      text = option.search_text
-      matchIndex = @fuzzy(text, pattern)
-      if matchIndex >= 0
-        liText = text.substr(0, matchIndex)
-        liText += "<em>" + text.substr(matchIndex, pattern.length) + "</em>"
-        liText += text.substr(matchIndex + pattern.length)
-        matches.push(liText)
+      if option.group_array_index?
+        groupedData[option.group_array_index] ||= []
+        groupedData[option.group_array_index].push option.array_index
+    
+    for option in data
+      continue unless @include_option_in_results(option)
+
+      # covers groups and everything inside them
+      if option.group
+        matchIndex = fuzzy(option.label, pattern)
+        groupIndexes = groupedData[option.array_index]
+
+        groupElements = []
+        for i in groupIndexes
+          continue unless @include_option_in_results(data[i])
+          g_matchIndex = @search_option(data[i], pattern)
+          # Won't add unless group header or text itself matches pattern
+          if g_matchIndex >= 0 || matchIndex >= 0
+            g_innerText = wrapAtIndex(data[i].html, g_matchIndex)
+            groupElements.push @make_option_element(data[i], g_innerText)
+  
+        if matchIndex >= 0 || groupElements.length > 0
+          innerText = wrapAtIndex(option.label, matchIndex)
+          matches.push @make_option_element(option, innerText)
+          matches = matches.concat(groupElements)
+          
+      # covers ungrouped options
+      else if not option.group_array_index?
+        matchIndex = fuzzy(option.html, pattern)
+        if matchIndex >= 0
+          innerText = wrapAtIndex(option.html, matchIndex)
+          matches.push @make_option_element(option, innerText)
 
     return matches
 
 
-  the_winnowing: ->
-    @no_results_clear()
 
-    searchText = @get_search_text()
-    results = @get_matches(@results_data, searchText)
-
-
-    @result_clear_highlight()
-
-    if results.length < 1 and searchText.length
-      @update_results_content("")
-      @no_results(searchText)
-    else
-      @update_results_content(results.join(''))
-      @winnow_results_set_highlight()
-
-
-  fuzzy: (text, pattern) ->
-
-
-    return -1
-
-                  
-  winnow_results: ->
-
-    # @the_winnowing()
-    # return
-          
-    this.no_results_clear()
-
-
-    results = 0
-
-    searchText = this.get_search_text()
+  # Need to replicate the old search pattern in the right fashion here.
+  # Won't have the old flags per say, but should have the same regexes. 
+  old_search_function: (option, searchText) ->
     escapedSearchText = searchText.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")
     regexAnchor = if @search_contains then "" else "^"
     regex = new RegExp(regexAnchor + escapedSearchText, 'i')
     zregex = new RegExp(escapedSearchText, 'i')
 
-    for option in @results_data
-
-      option.search_match = false
-      results_group = null
-
-      if this.include_option_in_results(option)
-
-        if option.group
-          option.group_match = false
-          option.active_options = 0
-
-        if option.group_array_index? and @results_data[option.group_array_index]
-          results_group = @results_data[option.group_array_index]
-          results += 1 if results_group.active_options is 0 and results_group.search_match
-          results_group.active_options += 1
-                
-        unless option.group and not @group_search
-
-          option.search_text = if option.group then option.label else option.html
-          option.search_match = this.search_string_match(option.search_text, regex)
-#          option.search_match = @fuzzy_match(option.search_text, searchText)
-          results += 1 if option.search_match and not option.group
-
-          if option.search_match
-            if searchText.length
-              startpos = option.search_text.search zregex
-              start_text = option.search_text
-              option.search_text = start_text.substr(0, startpos) + '<em>' +
-                                   start_text.substr(startpos, searchText.length) + '</em>' +
-                                   start_text.substr(startpos + searchText.length)
-            results_group.group_match = true if results_group?
-          
-          else if option.group_array_index? and @results_data[option.group_array_index].search_match
-            option.search_match = true
-
-    this.result_clear_highlight()
-
-    if results < 1 and searchText.length
-      this.update_results_content ""
-      this.no_results searchText
-    else
-      this.update_results_content this.results_option_build()
-      this.winnow_results_set_highlight()
+    search_match = @search_string_match(searchText, regex)
+    startpos = option.search_text.search zregex
+    start_text = option.search_text
+    search_text = start_text.substr(0, startpos) + '<em>' +
+                  start_text.substr(startpos, searchText.length) + '</em>' +
+                  start_text.substr(startpos + searchText.length)
+    
+    return -1
 
   search_string_match: (search_string, regex) ->
     if regex.test search_string
@@ -235,17 +188,27 @@ class AbstractChosen
           if regex.test part
             return true
 
-  # A wrapper to the fuzzy search function to bring it's functionality
-  # more in line with search_string_match.
-  fuzzy_match: (string_to_search, search_text) ->
-    string_to_search = string_to_search.toLowerCase()
-    search_text = search_text.toLowerCase()
-    
-    if search_text.length == 0
-      return true
-    return fuzzy(string_to_search, search_text) || undefined
 
-            
+  winnow_results: ->
+    @no_results_clear()
+
+    searchText = @get_search_text()
+    results = @get_matches(@results_data, searchText)
+
+    @result_clear_highlight()
+    @update_results_content("")
+
+    if results.length < 1 and searchText.length
+      @no_results(searchText)
+    else
+      resFragment = document.createDocumentFragment()
+      for r in results
+        resFragment.appendChild(r)
+
+      @update_results_content(resFragment)
+      @winnow_results_set_highlight()
+
+
 
   choices_count: ->
     return @selected_option_count if @selected_option_count?

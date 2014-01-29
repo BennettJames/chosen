@@ -166,7 +166,7 @@ class @Chosen extends AbstractChosen
     else
       this.close_field()
 
-    results_build: ->
+  results_build: ->
     @parsing = true
     @selected_option_count = null
 
@@ -183,7 +183,8 @@ class @Chosen extends AbstractChosen
         @search_field.readOnly = false
         @container.removeClassName "chosen-container-single-nosearch"
 
-    this.update_results_content this.results_option_build({first:true})
+    @initialize_selected_option(d) for d in @results_data when d.selected
+    @update_results_content(@make_option_element(d) for d in @results_data)
 
     this.search_field_disabled()
     this.show_search_field_default()
@@ -229,7 +230,8 @@ class @Chosen extends AbstractChosen
     this.winnow_results()
 
   update_results_content: (content) ->
-    @search_results.update content
+    @search_results.update ''
+    @search_results.appendChild(content)
 
   results_hide: ->
     if @results_showing

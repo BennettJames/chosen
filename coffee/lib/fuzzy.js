@@ -1,6 +1,8 @@
 var fuzzy = function(text, pattern, options) {
 
   options = options || {};
+  text = text.toLowerCase();
+  pattern = pattern.toLowerCase();
 
   // Aproximately where in the text is the pattern expected to be found?
   var Match_Location = options.location || 0;
@@ -19,8 +21,14 @@ var fuzzy = function(text, pattern, options) {
   // a threshold of '1.0' would match anything.
   var Match_Threshold = options.threshold || 0.4;
 
-  if (pattern === text) return true; // Exact match
-  if (pattern.length > 32) return false; // This algorithm cannot be used
+  if (pattern === text) {
+    return 0;
+  }
+
+  if (pattern.length === 0) {
+   return 0; // Exact match
+  }
+  if (pattern.length > 32) return -1; // This algorithm cannot be used
 
   // Set starting location at beginning text and initialise the alphabet.
   var loc = Match_Location,
@@ -128,6 +136,7 @@ var fuzzy = function(text, pattern, options) {
     }
     last_rd = rd;
   }
-
-  return (best_loc < 0) ? false : true;
+  
+  
+  return (best_loc < 0) ? -1 : best_loc;
 };

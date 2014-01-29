@@ -189,7 +189,8 @@ class Chosen extends AbstractChosen
         @search_field[0].readOnly = false
         @container.removeClass "chosen-container-single-nosearch"
 
-    this.update_results_content this.results_option_build({first:true})
+    @initialize_selected_option(d) for d in @results_data when d.selected
+    @update_results_content(@make_option_element(d) for d in @results_data)
 
     this.search_field_disabled()
     this.show_search_field_default()
