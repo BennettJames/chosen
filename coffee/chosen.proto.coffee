@@ -184,7 +184,7 @@ class @Chosen extends AbstractChosen
         @container.removeClassName "chosen-container-single-nosearch"
 
     @initialize_selected_option(d) for d in @results_data when d.selected
-    @update_results_content(@make_option_element(d) for d in @results_data)
+    @update_results_content(@results_option_build())
 
     this.search_field_disabled()
     this.show_search_field_default()
@@ -231,7 +231,10 @@ class @Chosen extends AbstractChosen
 
   update_results_content: (content) ->
     @search_results.update ''
-    @search_results.appendChild(content)
+    if content instanceof DocumentFragment
+      @search_results.appendChild(content)
+    else
+      @search_results.update content
 
   results_hide: ->
     if @results_showing

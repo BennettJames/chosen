@@ -19,7 +19,7 @@ var fuzzy = function(text, pattern, options) {
   // At what point does the match algorithm give up. A threshold of
   // '0.0' requires a perfect match (of both letters and location),
   // a threshold of '1.0' would match anything.
-  var Match_Threshold = options.threshold || 0.4;
+  var Match_Threshold = options.threshold || 0.27;
 
   if (pattern === text) {
     return 0;
