@@ -230,8 +230,8 @@ class @Chosen extends AbstractChosen
     this.winnow_results()
 
   update_results_content: (content) ->
-    @search_results.update ''
     if content instanceof DocumentFragment
+      @search_results.update ''
       @search_results.appendChild(content)
     else
       @search_results.update content

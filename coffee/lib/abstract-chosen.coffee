@@ -163,7 +163,11 @@ class AbstractChosen
       @update_results_content(resFragment)
       @winnow_results_set_highlight()
 
-  # Decides which search function to build. 
+  # Decides which search function to build. The "built" search function
+  # should take an option as a single argument, and return two values:
+  # the first a flag indicating whether or not the text was found, and the
+  # second the text to show if the search is visible (e.g. underline for the
+  # matched substring)
   make_search_function: (searchText) ->
     if @search_miss_rate > 0
       return @make_fuzzy_search(searchText)
@@ -192,11 +196,6 @@ class AbstractChosen
       resText = @emphasize_substr(text, matchIndex, searchText.length)
       return [matchIndex >= 0, resText]
 
-  # Generates a function to test whether an option matches a pattern. Pass
-  # in the pattern to generate the function. The resultant function returns
-  # two values on being passed an option: whether or not the pattern was
-  # matched in the option, and the text to display in the list if it was
-  # found. 
   make_fuzzy_search: (pattern) ->
     pattern = pattern.toLowerCase()
     return (option) =>

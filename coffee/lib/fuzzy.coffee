@@ -1,4 +1,12 @@
 
+# Performs a search in the text for a given pattern. At base,
+# uses Levenshtein distance to determine the best match. Augmented
+# to keep track of the length of the match. Will return the match
+# with the best distance score. If multiple matches are found, the
+# longest, ealiest match is selected.
+#
+# @return [Int, Int] - Returns [location, length] of the found
+# match. Returns [-1,0] if no match under the errRate is found.
 fuzzyTextSearch = (text, pattern, errRate=0) ->
 
     return [-1,0] if text.length == 0
@@ -38,7 +46,7 @@ fuzzyTextSearch = (text, pattern, errRate=0) ->
             lengths[i][j] = lengths[i][j-1] - 1
           else if best == sub
             lengths[i][j] = lengths[i-1][j-1]
-
+            
     bestIndex = tLen
     for i in [tLen...0]
       if (vals[i][pLen] < vals[bestIndex][pLen]) or 
@@ -52,40 +60,3 @@ fuzzyTextSearch = (text, pattern, errRate=0) ->
     else
       return [-1, 0]
 
-
-fuzzyCases = [
-  {
-    args: ["abc", "aabc", 1],
-    res: [0, 3]
-  },
-  {
-    args: ["abbc", "abac", 1],
-    res: [0, 4]
-  },
-  {
-    args: ["abbc", "abc", 1],
-    res: [0, 4]
-  },
-  {
-    args: ["abc", "aabc", .3],
-    res: [0, 3] 
-  }, 
-  {
-    args: ["abcd", "bbcd", .2],
-    res: [-1, 0]
-  },
-  {
-    args: ["abcdefgh", "abbcdxfh", 1],
-    res: [0, 8]
-  },
-  {
-    args: ["abcdefg", "effg", 1], 
-    res: [4, 3]
-  },
-  {
-    args: ["aaaabcddddd", "dabc", 1],
-    res: [3, 3]
-  }
-]
-
-# (console.log(fuzzyTextSearch.apply(this, c.args), c.res)) for c in fuzzyCases
