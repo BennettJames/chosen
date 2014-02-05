@@ -43,7 +43,7 @@ fuzzyTextSearch = (text, pattern, errRate=0) ->
     for i in [tLen...0]
       if (vals[i][pLen] < vals[bestIndex][pLen]) or 
          (vals[i][pLen] == vals[bestIndex][pLen] and
-          lengths[i][pLen] > lengths[bestIndex][pLen])
+          lengths[i][pLen] >= lengths[bestIndex][pLen])
         bestIndex = i
 
     matchLength = pLen + lengths[bestIndex][pLen]
