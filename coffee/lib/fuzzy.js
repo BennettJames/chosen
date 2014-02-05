@@ -1,8 +1,6 @@
 var fuzzy = function(text, pattern, options) {
 
   options = options || {};
-  text = text.toLowerCase();
-  pattern = pattern.toLowerCase();
 
   // Aproximately where in the text is the pattern expected to be found?
   var Match_Location = options.location || 0;

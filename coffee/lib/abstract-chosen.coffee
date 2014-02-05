@@ -29,6 +29,7 @@ class AbstractChosen
     @inherit_select_classes = @options.inherit_select_classes || false
     @display_selected_options = if @options.display_selected_options? then @options.display_selected_options else true
     @display_disabled_options = if @options.display_disabled_options? then @options.display_disabled_options else true
+    @search_miss_rate = if @options.search_miss_rate? then @options.search_miss_rate else 0.3 
 
   set_default_text: ->
     if @form_field.getAttribute("data-placeholder")
@@ -53,7 +54,6 @@ class AbstractChosen
     if not @mouse_on_container
       @active_field = false
       setTimeout (=> this.blur_test()), 100
-
 
   results_update_field: ->
     this.set_default_text()
@@ -85,6 +85,12 @@ class AbstractChosen
       @single_set_selected_text option.text
       
 
+  results_option_build: ->
+    frag = document.createDocumentFragment()
+    for d in @results_data when @include_option_in_results(d)
+      frag.appendChild(@make_option_element(d))
+    return frag
+
   make_option_element: (option, text) ->
     newLi = document.createElement("li")
     text ||= if option.group then option.label else option.html
@@ -106,28 +112,7 @@ class AbstractChosen
     newLi.setAttribute "data-option-array-index", option.array_index
 
     return newLi
-
-
-
-  make_search_function: (pattern) ->
-    return (option) =>
-      text = option.label || option.html
-      matchIndex = fuzzy(text, pattern)
-      resText = @emphasize_substr(text, matchIndex, pattern.length)
-      return [matchIndex >= 0, resText]
-      
-
-  search_option: (option, pattern) ->
-    return fuzzy(option.label || option.html, pattern)
-
-
-  emphasize_substr: (str, index, length) ->
-    return str if index < 0 || length <= 0
-    return str.substr(0, index) +
-      "<em>" + str.substr(index, length) + "</em>" +
-      str.substr(index + length)
     
-
   # Returns an object representing the grouped structure of option indexes.
   # The keys are indexes of optgroups and ungrouped options. The values are
   # arrays of any options that belong in a given group.
@@ -138,13 +123,14 @@ class AbstractChosen
         groups[option.array_index] ||= []
     for option in data
       if @include_option_in_results(option) and option.group_array_index?
-        groups[option.group_array_index].push option.array_index
+        if groups[option.group_array_index]?
+          groups[option.group_array_index].push option.array_index
     return groups
-                                                                                                                  
-  get_matches: (data, pattern) ->
 
+  get_matches: (data, pattern) ->
     matches = []
     searcher = @make_search_function(pattern)
+
     for i, groupIndexes of @get_groups(data)
       option = data[i]
       [found, text] = searcher(option)
@@ -160,115 +146,70 @@ class AbstractChosen
       
     return matches
 
-    for option in data when @include_option_in_results(option)
-      [found, text] = searcher(option)
-      if option.group
-        groupElements = []
-        for i in groupedData[option.array_index]
-          [f, t] = searcher(data[i])
-          if (found or f) and @include_option_in_results(data[i])
-            groupElements.push @make_option_element(data[i], t)
+  winnow_results: ->
+    searchText = @get_search_text()
+    results = @get_matches(@results_data, searchText)
 
-        if found or groupElements.length > 0
-          matches.push @make_option_element(option, text)
-          matches.push(el) for el in groupElements
-  
-      else if found and not option.group_array_index?
-        matches.push @make_option_element(option, text)
+    @no_results_clear()
+    @result_clear_highlight()
 
-    matches = []
-    pSize = pattern.length
-    groupedData = @get_groups(@results_data)
-    searcher = @make_search_function(pattern)
+    if results.length < 1 and searchText.length
+      @update_results_content("")
+      @no_results(searchText)
+    else
+      resFragment = document.createDocumentFragment()
+      resFragment.appendChild(r) for r in results
 
-            
-    # for option in data
-    #   continue unless @include_option_in_results(option)
+      @update_results_content(resFragment)
+      @winnow_results_set_highlight()
 
-    #   # covers groups and everything inside them
-    #   if option.group
-    #     matchIndex = searcher(option)
+  # Decides which search function to build. 
+  make_search_function: (searchText) ->
+    if @search_miss_rate > 0
+      return @make_fuzzy_search(searchText)
+    else
+      return @make_regex_search(searchText)
 
-    #     groupElements = []
-    #     for i in groupedData[option.array_index]
-    #       continue unless @include_option_in_results(data[i])
-    #       g_matchIndex = searcher(data[i])
-    #       # Won't add unless group header or text itself matches pattern
-    #       if g_matchIndex >= 0 || matchIndex >= 0
-    #         g_innerText = @emphasize_substr(data[i].html, g_matchIndex, pSize)
-    #         groupElements.push @make_option_element(data[i], g_innerText)
-  
-    #     if matchIndex >= 0 || groupElements.length > 0
-    #       innerText = @emphasize_substr(option.label, matchIndex, pSize)
-    #       matches.push @make_option_element(option, innerText)
-    #       matches = matches.concat(groupElements)
-          
-    #   # covers ungrouped options
-    #   else if not option.group_array_index?
-    #     matchIndex = searcher(option)
-    #     if matchIndex >= 0
-    #       innerText = @emphasize_substr(option.html, matchIndex, pSize)
-    #       matches.push @make_option_element(option, innerText)
-
-    return matches
-
-  
-
-  # Need to replicate the old search pattern in the right fashion here.
-  # Won't have the old flags per say, but should have the same regexes. 
-  make_old_search_function: (searchText) ->
+  make_regex_search: (searchText) ->
     escapedSearchText = searchText.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")
     regexAnchor = if @search_contains then "" else "^"
     regex = new RegExp(regexAnchor + escapedSearchText, 'i')
     zregex = new RegExp(escapedSearchText, 'i')
 
-    search_match = @search_string_match(searchText, regex)
-    startpos = option.search_text.search zregex
-    start_text = option.search_text
-    search_text = start_text.substr(0, startpos) + '<em>' +
-                  start_text.substr(startpos, searchText.length) + '</em>' +
-                  start_text.substr(startpos + searchText.length)
-    
-    return (option) -> search_string_match(option.label || option.html, regex)
+    return (option) =>
+      text = option.label || option.html
+      matchIndex = text.search(regex)
+      
+      if matchIndex < 0 and @enable_split_word_search and (
+          text.indexOf(" ") >= 0 or text.indexOf("[") == 0)
+        parts = text.replace(/\[|\]/g, "").split(" ")
+        if parts.length
+          for part in parts
+            if regex.test(part)
+              matchIndex = text.search(zregex)
+              break
 
-  search_string_match: (search_string, regex) ->
-    if regex.test search_string
-      return true
-    else if @enable_split_word_search and (search_string.indexOf(" ") >= 0 or search_string.indexOf("[") == 0)
-      #TODO: replace this substitution of /\[\]/ with a list of characters to skip.
-      parts = search_string.replace(/\[|\]/g, "").split(" ")
-      if parts.length
-        for part in parts
-          if regex.test part
-            return true
+      resText = @emphasize_substr(text, matchIndex, searchText.length)
+      return [matchIndex >= 0, resText]
 
+  # Generates a function to test whether an option matches a pattern. Pass
+  # in the pattern to generate the function. The resultant function returns
+  # two values on being passed an option: whether or not the pattern was
+  # matched in the option, and the text to display in the list if it was
+  # found. 
+  make_fuzzy_search: (pattern) ->
+    pattern = pattern.toLowerCase()
+    return (option) =>
+      text = (option.label || option.html)
+      [mIndex, mLen] = fuzzyTextSearch(text.toLowerCase(), pattern, @search_miss_rate)
+      return [mIndex >= 0, @emphasize_substr(text, mIndex, mLen)]
 
-  results_option_build: ->
-    frag = document.createDocumentFragment()
-    frag.appendChild(@make_option_element(d)) for d in @results_data 
-    return frag
-
-  winnow_results: ->
-    @no_results_clear()
-
-    searchText = @get_search_text()
-    results = @get_matches(@results_data, searchText)
-
-    @result_clear_highlight()
-    @update_results_content("")
-
-    if results.length < 1 and searchText.length
-      @no_results(searchText)
-    else
-      resFragment = document.createDocumentFragment()
-      for r in results
-        resFragment.appendChild(r)
-
-      @update_results_content(resFragment)
-      @winnow_results_set_highlight()
-
-
-
+  emphasize_substr: (str, index, length) ->
+    return str if index < 0 || length <= 0
+    return str.substr(0, index) +
+      "<em>" + str.substr(index, length) + "</em>" +
+      str.substr(index + length)
+  
   choices_count: ->
     return @selected_option_count if @selected_option_count?
 

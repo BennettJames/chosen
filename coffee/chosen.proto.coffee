@@ -184,7 +184,7 @@ class @Chosen extends AbstractChosen
         @container.removeClassName "chosen-container-single-nosearch"
 
     @initialize_selected_option(d) for d in @results_data when d.selected
-    @update_results_content(@results_option_build())
+    @update_results_content @results_option_build()
 
     this.search_field_disabled()
     this.show_search_field_default()
